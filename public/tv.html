@@ -12,8 +12,9 @@
 <body>
   <div id="fit"><div id="stage"></div></div>
   <div id="hint"></div>
-  <!-- Playing video keeps TV browsers from starting their screensaver -->
-  <video id="wakevideo" muted loop playsinline autoplay></video>
+  <!-- Full-viewport looping video (behind the stage): the only reliable way to
+       stop the LG/webOS TV screensaver is a real video playing fullscreen. -->
+  <video id="wakevideo" muted loop playsinline autoplay preload="auto"></video>
   <script type="module" src="/core/tv.js"></script>
 </body>
 </html>

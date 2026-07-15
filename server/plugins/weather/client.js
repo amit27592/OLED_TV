@@ -11,10 +11,32 @@ function chips(data, g, { prefix = true } = {}) {
   return parts;
 }
 
+// Inline style for an absolutely-positioned corner badge (anchored to #stage,
+// which already does the slow anti-burn-in pixelshift, so it drifts too).
+function cornerPos(pos) {
+  return ({
+    tl: 'top:96px;left:120px;align-items:flex-start;text-align:left',
+    tr: 'top:96px;right:120px;align-items:flex-end;text-align:right',
+    bl: 'bottom:96px;left:120px;align-items:flex-start;text-align:left',
+    br: 'bottom:96px;right:120px;align-items:flex-end;text-align:right',
+  })[pos] || 'top:96px;right:120px;align-items:flex-end;text-align:right';
+}
+
+// Optional live-clock badge. The hh:mm/date use data-clk spans so the core's
+// per-second tick keeps them current without re-rendering the weather view.
+function timeBadge({ cfg, g }) {
+  if (!cfg.showTime) return '';
+  return `
+    <div style="position:absolute;${cornerPos(cfg.timeCorner)};display:flex;flex-direction:column;gap:8px;z-index:2">
+      <div style="font-size:56px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums">${g.clk('hh')}:${g.clk('mm')}</div>
+      <div style="font-size:22px;letter-spacing:.24em;text-transform:uppercase;color:${g.S}">${g.clk('dateLong')}</div>
+    </div>`;
+}
+
 export default {
   id: 'weather',
   render: {
-    a({ data, g }) {
+    a({ cfg, data, g }) {
       const f = data.fields;
       const detail = chips(data, g).map((c) => `<span>${c}</span>`).join('');
       const hourly = f.hourly ? `
@@ -34,10 +56,10 @@ export default {
           ${hourly}
           ${f.tomorrow ? `<div style="font-size:28px;color:${g.T}">Tomorrow · ${g.esc(data.tomorrow.cond)} · H ${g.esc(data.tomorrow.hi)} L ${g.esc(data.tomorrow.lo)} · Rain ${g.esc(data.tomorrow.precip)}</div>` : ''}
         </div>
-      </div>`;
+      </div>${timeBadge({ cfg, g })}`;
     },
 
-    b({ data, g }) {
+    b({ cfg, data, g }) {
       const f = data.fields;
       const detail = chips(data, g, { prefix: false }).map((c) => `<span>${c}</span>`).join('');
       const hourly = f.hourly ? `
@@ -54,10 +76,10 @@ export default {
           ${hourly}
           ${f.tomorrow ? `<div style="margin-top:34px;font-family:'Space Mono',monospace;font-size:24px;color:${g.T}">Tomorrow · ${g.esc(data.tomorrow.cond)} · ${g.esc(data.tomorrow.hi)} / ${g.esc(data.tomorrow.lo)} · Rain ${g.esc(data.tomorrow.precip)}</div>` : ''}
         </div>
-      </div>`;
+      </div>${timeBadge({ cfg, g })}`;
     },
 
-    c({ data, g }) {
+    c({ cfg, data, g }) {
       const f = data.fields;
       const detail = chips(data, g, { prefix: false });
       if (f.tomorrow) detail.push(`Tomorrow ${g.esc(data.tomorrow.hi)}/${g.esc(data.tomorrow.lo)}`);
@@ -71,7 +93,7 @@ export default {
         ${detail.length ? `<div style="display:flex;gap:44px;flex-wrap:wrap;font-size:28px;color:${g.T}">${detail.map((c) => `<span>${c}</span>`).join('')}</div>` : ''}
         <div style="font-size:34px;color:${g.S}">${g.esc(data.cond)} · ${g.esc(data.city)} · H ${g.esc(data.hi)} L ${g.esc(data.lo)}</div>
         <div style="font-size:280px;line-height:.74;font-weight:600;letter-spacing:-.03em">${g.esc(data.temp)}<span style="color:${g.T}">${g.esc(data.unit)}</span></div>
-      </div>`;
+      </div>${timeBadge({ cfg, g })}`;
     },
   },
 };

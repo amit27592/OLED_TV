@@ -213,9 +213,9 @@ document.addEventListener('keydown', (e) => {
     else if (state.config?.views?.[n - 1]) setView(state.config.views[n - 1]);
   } else if (e.key === 'c' || e.key === 'C') {
     toggleCycle();
-  } else if (e.key === 'ArrowRight') {
+  } else if (e.key === 'ArrowUp') {
     stepView(1);
-  } else if (e.key === 'ArrowLeft') {
+  } else if (e.key === 'ArrowDown') {
     stepView(-1);
   }
 });
@@ -236,19 +236,11 @@ document.addEventListener('visibilitychange', () => {
 
 function startWakeVideo() {
   const v = document.getElementById('wakevideo');
-  try {
-    if (typeof HTMLCanvasElement !== 'undefined' && HTMLCanvasElement.prototype.captureStream) {
-      const c = document.createElement('canvas');
-      c.width = c.height = 2;
-      const cx = c.getContext('2d');
-      setInterval(() => { cx.fillStyle = '#000'; cx.fillRect(0, 0, 2, 2); }, 1000);
-      v.srcObject = c.captureStream(1);
-    } else {
-      v.src = '/assets/blank.mp4';
-    }
-  } catch {
-    v.src = '/assets/blank.mp4';
-  }
+  // Play a real, looping, full-viewport video file through the hardware decoder.
+  // On webOS this is the one thing that actually holds off the TV screensaver —
+  // a canvas.captureStream or a hidden/tiny element isn't treated as fullscreen
+  // video playback by the TV's power manager, so those never suppressed it.
+  if (!v.src) v.src = '/assets/blank.mp4';
   v.play().catch(() => { /* retried on first interaction */ });
 }
 

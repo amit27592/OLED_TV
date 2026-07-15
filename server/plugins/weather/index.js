@@ -144,10 +144,17 @@ export default {
     units: 'C',
     variant: 'standard', // minimal | standard | rich | custom
     fields: { ...PRESETS.standard },
+    showTime: false, // small live clock badge in a corner
+    timeCorner: 'tr', // tl | tr | bl | br
   },
   configSchema: [
     { key: 'city', label: 'City', type: 'text' },
     { key: 'units', label: 'Units', type: 'select', options: [['C', '°C'], ['F', '°F']] },
+    { key: 'showTime', label: 'Show time badge', type: 'toggle' },
+    {
+      key: 'timeCorner', label: 'Time badge corner', type: 'select',
+      options: [['tl', 'Top left'], ['tr', 'Top right'], ['bl', 'Bottom left'], ['br', 'Bottom right']],
+    },
     {
       key: 'variant', label: 'Treatment', type: 'select',
       options: [['minimal', 'Minimal'], ['standard', 'Standard'], ['rich', 'Rich'], ['custom', 'Custom']],
