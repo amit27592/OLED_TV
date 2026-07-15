@@ -1,7 +1,8 @@
-// Weather view. MOCK DATA — deterministic per city + hour so it looks alive.
-// To wire a real feed: replace mockWeather() with a fetch to your provider
-// (e.g. Open-Meteo: https://api.open-meteo.com/v1/forecast?latitude=..&longitude=..)
-// and keep the returned shape identical.
+// Weather view. LIVE DATA via Open-Meteo (shared client in server/lib/openmeteo.js):
+// the configured city is geocoded once, forecasts are cached ~10 min per location.
+// mockWeather() is kept only as the fallback when the network / geocoding fails,
+// so the screen never goes blank (payload then carries mock: true).
+import { forecastForCity, condition, compass } from '../../lib/openmeteo.js';
 
 const PRESETS = {
   minimal:  { feels: false, precip: false, wind: false, humidity: false, hourly: false, tomorrow: false, rainNote: false },
@@ -18,12 +19,70 @@ function hash(str) {
   return Math.abs(h);
 }
 
-function hourLabel(d) {
-  const h = d.getHours();
+function hourLabel(h) {
   if (h === 0) return '12 AM';
   if (h < 12) return `${h} AM`;
   if (h === 12) return '12 PM';
   return `${h - 12} PM`;
+}
+
+// Label for a location-local ISO string like '2026-07-15T14:00'.
+const isoHourLabel = (iso) => hourLabel(Number(iso.slice(11, 13)));
+
+async function liveWeather(city, units) {
+  const { loc, fc } = await forecastForCity(city);
+  const toU = (c) => (units === 'F' ? Math.round(c * 9 / 5 + 32) : Math.round(c));
+  const cur = fc.current;
+  const H = fc.hourly;
+  const D = fc.daily;
+
+  // Current position in the hourly series (all times are location-local).
+  let idx = H.time.indexOf(cur.time.slice(0, 13) + ':00');
+  if (idx === -1) idx = 0;
+
+  const hourly = [];
+  for (let i = 0; i < 6 && idx + i < H.time.length; i++) {
+    hourly.push({
+      h: i === 0 ? 'Now' : isoHourLabel(H.time[idx + i]),
+      t: `${toU(H.temperature_2m[idx + i])}°`,
+      p: `${Math.round(H.precipitation_probability?.[idx + i] ?? 0)}%`,
+    });
+  }
+
+  let rainLine = 'No rain expected today.';
+  const today = cur.time.slice(0, 10);
+  for (let i = idx; i < H.time.length && H.time[i].startsWith(today); i++) {
+    if ((H.precipitation_probability?.[i] ?? 0) >= 50) {
+      rainLine = `Rain likely around ${isoHourLabel(H.time[i])}.`;
+      break;
+    }
+  }
+
+  const windSpeed = units === 'F'
+    ? `${Math.round(cur.wind_speed_10m * 0.621371)} mph`
+    : `${Math.round(cur.wind_speed_10m)} km/h`;
+
+  return {
+    city: loc.name || city,
+    temp: String(toU(cur.temperature_2m)),
+    unit: '°',
+    cond: condition(cur.weather_code),
+    hi: `${toU(D.temperature_2m_max[0])}°`,
+    lo: `${toU(D.temperature_2m_min[0])}°`,
+    feelsT: `${toU(cur.apparent_temperature)}°`,
+    precipP: `${Math.round(H.precipitation_probability?.[idx] ?? 0)}%`,
+    windV: `${windSpeed} ${compass(cur.wind_direction_10m)}`,
+    humidityV: `${Math.round(cur.relative_humidity_2m)}%`,
+    rainLine,
+    hourly,
+    tomorrow: {
+      cond: condition(D.weather_code[1]),
+      hi: `${toU(D.temperature_2m_max[1])}°`,
+      lo: `${toU(D.temperature_2m_min[1])}°`,
+      precip: `${Math.round(D.precipitation_probability_max?.[1] ?? 0)}%`,
+    },
+    mock: false,
+  };
 }
 
 function mockWeather(city, units) {
@@ -46,7 +105,7 @@ function mockWeather(city, units) {
   for (let i = 0; i < 6; i++) {
     const t = new Date(now.getTime() + i * 3600000);
     hourly.push({
-      h: i === 0 ? 'Now' : hourLabel(t),
+      h: i === 0 ? 'Now' : hourLabel(t.getHours()),
       t: `${toU(curve(t.getHours()))}°`,
       p: `${Math.min(90, precipBase + ((hash(city + day + i) % 5) * 10))}%`,
     });
@@ -79,7 +138,7 @@ function mockWeather(city, units) {
 export default {
   id: 'weather',
   name: 'Weather',
-  description: 'Current conditions, hourly strip and tomorrow — Google-weather style content.',
+  description: 'Live conditions, hourly strip and tomorrow via Open-Meteo — set the city below.',
   defaultConfig: {
     city: 'San Francisco',
     units: 'C',
@@ -101,8 +160,14 @@ export default {
       ],
     },
   ],
-  getData(cfg) {
+  async getData(cfg) {
     const fields = cfg.variant === 'custom' ? { ...PRESETS.standard, ...cfg.fields } : PRESETS[cfg.variant] || PRESETS.standard;
-    return { ...mockWeather(cfg.city || 'San Francisco', cfg.units), fields };
+    const city = cfg.city || 'San Francisco';
+    try {
+      return { ...(await liveWeather(city, cfg.units)), fields };
+    } catch (err) {
+      console.warn(`[weather] live fetch failed for "${city}" (${err.message}) — showing mock data`);
+      return { ...mockWeather(city, cfg.units), fields };
+    }
   },
 };

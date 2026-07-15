@@ -3,7 +3,7 @@ export default {
   id: 'time',
   render: {
     a({ cfg, data, tv, g }) {
-      const city = tv.plugins?.weather?.city || tv.name || '';
+      const city = data.city || tv.plugins?.weather?.city || tv.name || '';
       const secs = cfg.showSeconds !== false
         ? `<span style="color:${g.T}">:${g.clk('ss')}</span>` : '';
       const sun = cfg.showSun !== false
@@ -18,8 +18,8 @@ export default {
       </div>`;
     },
 
-    b({ cfg, tv, g }) {
-      const city = tv.plugins?.weather?.city || tv.name || '';
+    b({ cfg, data, tv, g }) {
+      const city = data.city || tv.plugins?.weather?.city || tv.name || '';
       const secs = cfg.showSeconds !== false
         ? `<span style="color:${g.T}">:${g.clk('ss')}</span>` : '';
       return `
@@ -32,8 +32,8 @@ export default {
       </div>`;
     },
 
-    c({ cfg, tv, g }) {
-      const city = tv.plugins?.weather?.city || tv.name || '';
+    c({ cfg, data, tv, g }) {
+      const city = data.city || tv.plugins?.weather?.city || tv.name || '';
       const secs = cfg.showSeconds !== false
         ? `<span style="color:${g.T};font-size:150px">:${g.clk('ss')}</span>` : '';
       return `

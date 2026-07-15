@@ -62,10 +62,17 @@ Bundled plugins: `time`, `weather`, `todo` (manager page), `note` (editor page),
 
 ### Wiring real data
 
-Weather and F1 ship with clearly-marked mock data; see the comments at the top
-of `server/plugins/weather/index.js` and `server/plugins/f1/index.js` for where
-to plug in a real provider (Open-Meteo, Jolpica/Ergast, …) — keep the returned
-shape and everything downstream (renderers, live sync) keeps working.
+Weather and Time (sunrise/sunset) use live Open-Meteo data — no API key needed.
+The shared client in `server/lib/openmeteo.js` geocodes the configured city and
+caches forecasts ~10 min per location; if the network or geocoding fails,
+Weather falls back to its deterministic mock (payload carries `mock: true`) so
+the screen never goes blank. Time's location is configurable per TV and follows
+the Weather city when left blank.
+
+F1 still ships with clearly-marked mock data; see the comment at the top of
+`server/plugins/f1/index.js` for where to plug in a real provider
+(Jolpica/Ergast) — keep the returned shape and everything downstream
+(renderers, live sync) keeps working.
 
 ## Data & API
 

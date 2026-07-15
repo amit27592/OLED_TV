@@ -8,12 +8,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/core/ui.css">
+<style>
+  .list-item .txt { cursor: text; border-radius: 6px; }
+  .list-item .txt:hover { background: rgba(255, 255, 255, .07); box-shadow: 0 0 0 5px rgba(255, 255, 255, .07); }
+  input.txt-edit { flex: 1; width: auto; padding: 6px 10px; font-size: 14px; }
+</style>
 </head>
 <body>
   <header class="page-header">
     <nav class="crumbs" id="crumbs"></nav>
     <h1>To-Do</h1>
-    <div class="sub">Tasks are shared across all TVs and appear on screen instantly. Click the circle to complete, the priority chip to cycle it.</div>
+    <div class="sub">Tasks are shared across all TVs and appear on screen instantly. Click the circle to complete, the text to edit it, the priority chip to cycle it.</div>
   </header>
 
   <div class="grid" style="grid-template-columns:minmax(340px,540px) minmax(340px,1fr)">
@@ -57,7 +62,7 @@ async function load() {
   list.innerHTML = items.length ? items.map((t) => `
     <div class="list-item${t.done ? ' done' : ''}" data-id="${t.id}">
       <button class="dot${t.done ? ' done' : ''}" data-act="toggle" title="Toggle done"></button>
-      <span class="txt">${esc(t.text)}</span>
+      <span class="txt" data-act="edit" title="Click to edit">${esc(t.text)}</span>
       <span class="meta">${esc(t.meta)}</span>
       <button class="chip mini" data-act="prio" title="Cycle priority" style="width:52px">${PRIO[t.priority] || 'Med'}</button>
       <button class="chip mini danger" data-act="del" title="Delete">×</button>
@@ -71,6 +76,10 @@ list.addEventListener('click', async (e) => {
   const id = btn.closest('.list-item').dataset.id;
   const items = JSON.parse(list.dataset.items || '{}');
   const item = items[id];
+  if (btn.dataset.act === 'edit') {
+    startEdit(btn, item);
+    return;
+  }
   if (btn.dataset.act === 'toggle') {
     await fetch(`${API}/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done: !item.done }) });
   } else if (btn.dataset.act === 'prio') {
@@ -80,6 +89,32 @@ list.addEventListener('click', async (e) => {
   }
   load();
 });
+
+function startEdit(span, item) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'txt-edit';
+  input.maxLength = 200;
+  input.value = item.text;
+  span.replaceWith(input);
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+  let finished = false;
+  const finish = async (save) => {
+    if (finished) return;
+    finished = true;
+    const text = input.value.trim();
+    if (save && text && text !== item.text) {
+      await fetch(`${API}/${item.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+    }
+    load();
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') finish(true);
+    else if (e.key === 'Escape') finish(false);
+  });
+  input.addEventListener('blur', () => finish(true));
+}
 
 document.getElementById('new-priority').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip');
@@ -104,7 +139,8 @@ document.getElementById('new-text').addEventListener('keydown', (e) => { if (e.k
 
 // live-sync when tasks change from anywhere else
 new EventSource(`/api/tv/${tvId}/events`).addEventListener('data', (e) => {
-  if (JSON.parse(e.data).plugin === 'todo') load();
+  // don't clobber an in-progress text edit with a re-render
+  if (JSON.parse(e.data).plugin === 'todo' && !list.querySelector('.txt-edit')) load();
 });
 load();
 </script>
