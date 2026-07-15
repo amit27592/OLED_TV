@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Note — Edit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/core/ui.css">
+</head>
+<body>
+  <header class="page-header">
+    <nav class="crumbs" id="crumbs"></nav>
+    <h1>Featured Note</h1>
+    <div class="sub">One pinned note, shown on every TV that has the Note view enabled. Saves as you type.</div>
+  </header>
+
+  <div class="grid" style="grid-template-columns:minmax(340px,640px)">
+    <section class="card">
+      <h2>Content</h2>
+      <div class="label">Kicker</div>
+      <input type="text" id="kicker">
+      <div class="label">Title</div>
+      <input type="text" id="title">
+      <div class="label">Body</div>
+      <textarea id="body"></textarea>
+      <div class="label">Author</div>
+      <input type="text" id="author">
+      <div class="label">Date label</div>
+      <input type="text" id="dateLabel">
+      <div class="status-line" id="status">&nbsp;</div>
+      <div class="hint-text">The author line only shows on TVs where “Author line” is enabled in the configurator.</div>
+    </section>
+  </div>
+
+<script type="module">
+const tvId = location.pathname.split('/').filter(Boolean)[0];
+document.getElementById('crumbs').innerHTML =
+  `<a href="/">← All TVs</a><a href="/${tvId}/config">Configurator</a><a href="/${tvId}" target="_blank">Open TV screen ↗</a>`;
+
+const API = '/api/plugins/note/content';
+const FIELDS = ['kicker', 'title', 'body', 'author', 'dateLabel'];
+const status = document.getElementById('status');
+let saveTimer = null;
+
+const note = await fetch(API).then((r) => r.json());
+for (const f of FIELDS) document.getElementById(f).value = note[f] || '';
+
+function queueSave() {
+  clearTimeout(saveTimer);
+  status.textContent = 'Saving…';
+  saveTimer = setTimeout(async () => {
+    const body = Object.fromEntries(FIELDS.map((f) => [f, document.getElementById(f).value]));
+    await fetch(API, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    status.innerHTML = '<span class="on">Saved — live on all TVs</span>';
+  }, 500);
+}
+for (const f of FIELDS) document.getElementById(f).addEventListener('input', queueSave);
+</script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>To-Do — Manage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/core/ui.css">
+</head>
+<body>
+  <header class="page-header">
+    <nav class="crumbs" id="crumbs"></nav>
+    <h1>To-Do</h1>
+    <div class="sub">Tasks are shared across all TVs and appear on screen instantly. Click the circle to complete, the priority chip to cycle it.</div>
+  </header>
+
+  <div class="grid" style="grid-template-columns:minmax(340px,540px) minmax(340px,1fr)">
+    <section class="card">
+      <h2>Add task</h2>
+      <div class="label">Task</div>
+      <input type="text" id="new-text" placeholder="What needs doing?">
+      <div class="label">Due</div>
+      <input type="date" id="new-due">
+      <div class="label">Priority</div>
+      <div class="chips" id="new-priority">
+        <button class="chip" data-p="high">High</button>
+        <button class="chip active" data-p="med">Medium</button>
+        <button class="chip" data-p="low">Low</button>
+      </div>
+      <div class="chips"><button class="chip" id="add-btn" style="margin-top:8px">Add task ↵</button></div>
+    </section>
+
+    <section class="card">
+      <h2>Tasks</h2>
+      <div id="list"><p class="hint-text">Loading…</p></div>
+    </section>
+  </div>
+
+<script type="module">
+const tvId = location.pathname.split('/').filter(Boolean)[0];
+document.getElementById('crumbs').innerHTML =
+  `<a href="/">← All TVs</a><a href="/${tvId}/config">Configurator</a><a href="/${tvId}" target="_blank">Open TV screen ↗</a>`;
+
+const esc = (s) => String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const API = '/api/plugins/todo/items';
+const list = document.getElementById('list');
+const PRIO = { high: 'High', med: 'Med', low: 'Low' };
+const NEXT_PRIO = { high: 'med', med: 'low', low: 'high' };
+let newPriority = 'med';
+
+async function load() {
+  const items = await fetch(API).then((r) => r.json());
+  const order = { overdue: 0, today: 1, upcoming: 2 };
+  items.sort((a, b) => (a.done - b.done) || (order[a.when] - order[b.when]) || String(a.due).localeCompare(String(b.due)));
+  list.innerHTML = items.length ? items.map((t) => `
+    <div class="list-item${t.done ? ' done' : ''}" data-id="${t.id}">
+      <button class="dot${t.done ? ' done' : ''}" data-act="toggle" title="Toggle done"></button>
+      <span class="txt">${esc(t.text)}</span>
+      <span class="meta">${esc(t.meta)}</span>
+      <button class="chip mini" data-act="prio" title="Cycle priority" style="width:52px">${PRIO[t.priority] || 'Med'}</button>
+      <button class="chip mini danger" data-act="del" title="Delete">×</button>
+    </div>`).join('') : '<p class="hint-text">No tasks — add one on the left.</p>';
+  list.dataset.items = JSON.stringify(Object.fromEntries(items.map((t) => [t.id, t])));
+}
+
+list.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const id = btn.closest('.list-item').dataset.id;
+  const items = JSON.parse(list.dataset.items || '{}');
+  const item = items[id];
+  if (btn.dataset.act === 'toggle') {
+    await fetch(`${API}/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done: !item.done }) });
+  } else if (btn.dataset.act === 'prio') {
+    await fetch(`${API}/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ priority: NEXT_PRIO[item.priority] || 'med' }) });
+  } else if (btn.dataset.act === 'del') {
+    await fetch(`${API}/${id}`, { method: 'DELETE' });
+  }
+  load();
+});
+
+document.getElementById('new-priority').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  newPriority = chip.dataset.p;
+  for (const c of e.currentTarget.children) c.classList.toggle('active', c === chip);
+});
+
+async function add() {
+  const text = document.getElementById('new-text').value.trim();
+  if (!text) return;
+  await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, due: document.getElementById('new-due').value || null, priority: newPriority }),
+  });
+  document.getElementById('new-text').value = '';
+  load();
+}
+document.getElementById('add-btn').addEventListener('click', add);
+document.getElementById('new-text').addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+
+// live-sync when tasks change from anywhere else
+new EventSource(`/api/tv/${tvId}/events`).addEventListener('data', (e) => {
+  if (JSON.parse(e.data).plugin === 'todo') load();
+});
+load();
+</script>
+</body>
+</html>

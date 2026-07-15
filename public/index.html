@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OLED Dashboard — TVs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/core/ui.css">
+</head>
+<body>
+  <header class="page-header">
+    <h1>OLED Dashboard</h1>
+    <div class="sub">Pure black · white text only · anti burn-in motion. Open a TV URL on the TV browser, its configurator on any desktop. Visiting a new /&lt;id&gt; creates that TV.</div>
+  </header>
+
+  <div class="grid" id="tvs" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))"></div>
+
+  <div class="grid" style="grid-template-columns:minmax(280px,420px);margin-top:26px">
+    <section class="card">
+      <h2>Add a TV</h2>
+      <div class="label">TV id (used in the URL)</div>
+      <input type="text" id="new-id" placeholder="tv2">
+      <div class="chips"><button class="chip" id="add-btn">Create ↵</button></div>
+    </section>
+  </div>
+
+<script type="module">
+const esc = (s) => String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const wrap = document.getElementById('tvs');
+
+async function load() {
+  const tvs = await fetch('/api/tvs').then((r) => r.json());
+  wrap.innerHTML = tvs.length ? tvs.map((tv) => `
+    <div class="card tv-card">
+      <div class="tvname">${esc(tv.name)} <span class="status-line">${tv.connected ? '<span class="on">● connected</span>' : '○ offline'}</span></div>
+      <div class="tvlinks"><a href="/${esc(tv.id)}" target="_blank">TV screen ↗</a> &nbsp;·&nbsp; <a href="/${esc(tv.id)}/config">Configurator</a></div>
+    </div>`).join('')
+    : '<p class="hint-text">No TVs yet — create one below, then open its URL on the TV.</p>';
+}
+
+function add() {
+  const id = document.getElementById('new-id').value.trim().toLowerCase();
+  if (!/^[a-z0-9_-]{1,32}$/.test(id)) { alert('Use letters, numbers, - or _ (max 32 chars)'); return; }
+  location.href = `/${id}/config`;
+}
+document.getElementById('add-btn').addEventListener('click', add);
+document.getElementById('new-id').addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+load();
+setInterval(load, 10000);
+</script>
+</body>
+</html>

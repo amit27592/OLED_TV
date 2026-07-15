@@ -1,0 +1,12 @@
+{
+  "name": "oled-tv-dashboard",
+  "version": "1.0.0",
+  "description": "Self-hosted OLED TV dashboard — pure black, white text, anti-burn-in motion, pluggable views, live-synced per-TV config.",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

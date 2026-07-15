@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendar — Events</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/core/ui.css">
+</head>
+<body>
+  <header class="page-header">
+    <nav class="crumbs" id="crumbs"></nav>
+    <h1>Calendar</h1>
+    <div class="sub">Events are shared across all TVs. The TV shows today’s agenda, or the next upcoming events when today is empty.</div>
+  </header>
+
+  <div class="grid" style="grid-template-columns:minmax(340px,540px) minmax(340px,1fr)">
+    <section class="card">
+      <h2>Add event</h2>
+      <div class="label">Event</div>
+      <input type="text" id="new-name" placeholder="Design review">
+      <div class="label">Date</div>
+      <input type="date" id="new-date">
+      <div class="label">Time</div>
+      <input type="time" id="new-time" value="09:00">
+      <div class="chips"><button class="chip" id="add-btn" style="margin-top:8px">Add event ↵</button></div>
+    </section>
+
+    <section class="card">
+      <h2>Events</h2>
+      <div id="list"><p class="hint-text">Loading…</p></div>
+    </section>
+  </div>
+
+<script type="module">
+const tvId = location.pathname.split('/').filter(Boolean)[0];
+document.getElementById('crumbs').innerHTML =
+  `<a href="/">← All TVs</a><a href="/${tvId}/config">Configurator</a><a href="/${tvId}" target="_blank">Open TV screen ↗</a>`;
+
+const esc = (s) => String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const API = '/api/plugins/calendar/events';
+const list = document.getElementById('list');
+const today = new Date();
+document.getElementById('new-date').value =
+  `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+function dateLabel(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${WD[dt.getDay()]} ${d} ${MO[m - 1]}`;
+}
+
+async function load() {
+  const events = await fetch(API).then((r) => r.json());
+  if (!events.length) { list.innerHTML = '<p class="hint-text">No events — add one on the left.</p>'; return; }
+  let lastDate = null;
+  list.innerHTML = events.map((ev) => {
+    const header = ev.date !== lastDate ? `<div class="label" style="margin-top:14px">${esc(dateLabel(ev.date))} · ${esc(ev.date)}</div>` : '';
+    lastDate = ev.date;
+    return `${header}<div class="list-item" data-id="${ev.id}">
+      <span class="meta" style="margin-left:0">${esc(ev.time)}</span>
+      <span class="txt">${esc(ev.name)}</span>
+      <button class="chip mini danger" data-act="del" style="margin-left:auto" title="Delete">×</button>
+    </div>`;
+  }).join('');
+}
+
+list.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-act="del"]');
+  if (!btn) return;
+  await fetch(`${API}/${btn.closest('.list-item').dataset.id}`, { method: 'DELETE' });
+  load();
+});
+
+async function add() {
+  const name = document.getElementById('new-name').value.trim();
+  const date = document.getElementById('new-date').value;
+  if (!name || !date) return;
+  await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, date, time: document.getElementById('new-time').value || '09:00' }),
+  });
+  document.getElementById('new-name').value = '';
+  load();
+}
+document.getElementById('add-btn').addEventListener('click', add);
+document.getElementById('new-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+
+new EventSource(`/api/tv/${tvId}/events`).addEventListener('data', (e) => {
+  if (JSON.parse(e.data).plugin === 'calendar') load();
+});
+load();
+</script>
+</body>
+</html>

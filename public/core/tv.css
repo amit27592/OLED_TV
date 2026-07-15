@@ -1,0 +1,74 @@
+/* OLED TV renderer — pure black, white/gray text only. */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif;
+  color: #fff;
+}
+
+body.hide-cursor { cursor: none; }
+
+/* The stage is authored at 1920x1080 and scaled to fill the screen (2x on 4K). */
+#fit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#stage {
+  width: 1920px;
+  height: 1080px;
+  position: relative;
+  flex: none;
+  background: #000;
+  transform: scale(var(--fit-scale, 1));
+  /* extra slow whole-frame pixel shift on top of per-view drift */
+  animation: pixelshift 540s ease-in-out infinite alternate;
+}
+
+/* Anti burn-in motion (amplitude from --amp, set by motion config) */
+@keyframes drift  { 0% { transform: translate(0, 0); } 100% { transform: translate(var(--amp), calc(var(--amp) * -0.65)); } }
+@keyframes driftC { 0% { transform: translate(0, var(--amp)); } 100% { transform: translate(calc(var(--amp) * -0.4), calc(var(--amp) * -1)); } }
+@keyframes breathe { 0% { opacity: .8; } 100% { opacity: 1; } }
+@keyframes pixelshift {
+  0%   { translate: 0 0; }
+  25%  { translate: calc(var(--amp2, 4px) * -1) var(--amp2, 4px); }
+  50%  { translate: var(--amp2, 4px) var(--amp2, 4px); }
+  75%  { translate: var(--amp2, 4px) calc(var(--amp2, 4px) * -1); }
+  100% { translate: calc(var(--amp2, 4px) * -1) calc(var(--amp2, 4px) * -1); }
+}
+
+#hint {
+  position: fixed;
+  left: 50%;
+  bottom: 4vh;
+  transform: translateX(-50%);
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(12px, 1.1vw, 22px);
+  letter-spacing: .12em;
+  color: rgba(255, 255, 255, .45);
+  background: rgba(0, 0, 0, .75);
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 999px;
+  padding: .7em 1.6em;
+  opacity: 0;
+  transition: opacity .6s ease;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+}
+#hint.show { opacity: 1; }
+
+#wakevideo {
+  position: fixed;
+  width: 2px;
+  height: 2px;
+  left: -10px;
+  top: -10px;
+  opacity: 0.01; /* some TV browsers pause fully-hidden video */
+}
